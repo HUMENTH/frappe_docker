@@ -1,0 +1,54 @@
+name: erpnext-arm64
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 21 * * 6'
+permissions:
+  contents: read
+  packages: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Build and push
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/frappe/frappe_docker.git
+          cat > apps.list <<'EOF'
+          https://github.com/frappe/erpnext version-16
+          https://github.com/frappe/payments version-16
+          https://github.com/resilient-tech/india-compliance version-16
+          https://github.com/frappe/hrms version-16
+          https://github.com/frappe/india-payroll version-16
+          https://github.com/frappe/webshop version-16
+          https://github.com/frappe/crm main
+          https://github.com/frappe/insights version-3
+          https://github.com/frappe/print_designer main
+          https://github.com/frappe/builder master
+          https://github.com/frappe/builder_hub develop
+          https://github.com/frappe/raven main
+          https://github.com/meichthys/frappe_web_push main
+          https://github.com/frappe/eps version-16
+          https://github.com/frappe/ekyc_india version-16
+          https://github.com/iamimmanuelraj/block_administrator version-16
+          https://github.com/muneeb141/ghost main
+          https://github.com/frappe/suite_cloud develop
+          https://github.com/frappe/suite develop
+          EOF
+          jq -R -s 'split("\n") | map(select(length>0) | split(" ") | {url: .[0], branch: .[1]})' apps.list > apps.json
+          OWNER="$(echo "$GITHUB_REPOSITORY_OWNER" | tr 'A-Z' 'a-z')"
+          IMG="ghcr.io/${OWNER}/erpnext-custom"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker build --platform=linux/arm64 --progress=plain \
+            --build-arg=FRAPPE_PATH=https://github.com/frappe/frappe \
+            --build-arg=FRAPPE_BRANCH=version-16 \
+            --build-arg=CACHE_BUST="${GITHUB_RUN_ID}" \
+            --secret=id=apps_json,src=apps.json \
+            --tag "${IMG}:16-base" --file frappe_docker/images/layered/Containerfile frappe_docker
+          docker build --platform=linux/arm64 --tag "${IMG}:16" --file - . <<DOCKERFILE
+          FROM ${IMG}:16-base
+          USER root
+          RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg openssh-client && rm -rf /var/lib/apt/lists/*
+          USER frappe
+          DOCKERFILE
+          docker push "${IMG}:16"
