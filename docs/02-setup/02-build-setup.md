@@ -84,7 +84,7 @@ podman build \
 
 This repository is fully suited for automated builds, i.e. using CI/CD pipelines.
 
-See [Automated Builds and Deployment](../11-how-to/06-automated-builds-and-deployment.md) for more information.
+To choose and configure when a CI build fetches fresh application sources, follow [Control application-source refreshes in CI builds](../11-how-to/06-control-source-refreshes-in-ci-builds.md). For the deployment migration stage, see [Automate site migrations](../11-how-to/11-automate-site-migrations.md).
 
 ## Build args, secrets and flags
 
@@ -94,15 +94,21 @@ See [Automated Builds and Deployment](../11-how-to/06-automated-builds-and-deplo
 | FRAPPE_PATH          | Repository URL for Frappe framework source code. Defaults to <https://github.com/frappe/frappe>                               |
 | FRAPPE_BRANCH        | Branch to use for Frappe framework. Defaults to version-16                                                                    |
 | **Custom Apps**      |                                                                                                                               |
-| CACHE_BUST           | Can be used to invalidate the cached layer. See [Build Cache](../11-how-to/06-automated-builds-and-deployment.md#build-cache) |
+| CACHE_BUST           | Can be used to invalidate the cached layer. See [Build cache reference](../12-reference/04-build-cache.md#cache-invalidation) |
 | (secret) apps_json   | Passed via `--secret=id=apps_json,src=apps.json`. Never use `--build-arg` for this file.                                      |
 | **Dependencies**     |                                                                                                                               |
 | PYTHON_VERSION       | Python version for the base image                                                                                             |
 | NODE_VERSION         | Node.js version                                                                                                               |
 | DEBIAN_BASE          | Debian base version for base, custom, and bench images, defaults to `trixie` (`bookworm` for v15)                             |
+| INSTALL_WKHTMLTOPDF  | Include wkhtmltopdf, defaults to `true`. See the [deprecation plan](../13-explanation/09-wkhtmltopdf-deprecation.md).         |
 | WKHTMLTOPDF_VERSION  | wkhtmltopdf version                                                                                                           |
 | WKHTMLTOPDF_DISTRO   | use the specified distro for debian package. Default is `bookworm`                                                            |
 | INSTALL_CHROMIUM     | Configure chromium installation, defaults to `true` - needed for Frappe Workbench version >15                                 |
+
+The custom and production images enable pnpm through Corepack. If the selected
+Node.js version does not bundle Corepack, the image installs it separately.
+Apps can select their pnpm version with the `packageManager` field in
+`package.json`; Corepack downloads that version when the app build first uses pnpm.
 
 # Deploy the stack
 

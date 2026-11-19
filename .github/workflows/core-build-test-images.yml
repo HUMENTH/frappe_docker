@@ -24,6 +24,15 @@ on:
         type: string
         default: trixie
         description: Debian Base Distribution
+      install_wkhtmltopdf:
+        required: false
+        type: boolean
+        default: true
+        description: Include wkhtmltopdf for legacy PDF formats
+      accept_image_growth:
+        type: boolean
+        default: false
+        description: Warn when images exceed growth limits in a manual run on main
     outputs:
       frappe_version:
         description: "Resolved frappe image tag"
@@ -102,9 +111,12 @@ jobs:
 
       - name: Set build args
         run: |
-          echo "PYTHON_VERSION=${{ inputs.python_version }}" >> "$GITHUB_ENV"
-          echo "NODE_VERSION=${{ inputs.node_version }}" >> "$GITHUB_ENV"
-          echo "DEBIAN_BASE=${{ inputs.debian_base }}" >> "$GITHUB_ENV"
+          {
+            echo "PYTHON_VERSION=${{ inputs.python_version }}"
+            echo "NODE_VERSION=${{ inputs.node_version }}"
+            echo "DEBIAN_BASE=${{ inputs.debian_base }}"
+            echo "INSTALL_WKHTMLTOPDF=${{ inputs.install_wkhtmltopdf }}"
+          } >> "$GITHUB_ENV"
 
       - name: Build
         uses: docker/bake-action@v7.5.0
@@ -117,11 +129,17 @@ jobs:
           REGISTRY_USER: localhost:5000/frappe
 
       - name: Check image sizes
-        run: python3 .github/scripts/image_sizes.py check --repo "$APP_REPO" --version "$RELEASE_LINE" --arch "$IMAGE_ARCH"
+        run: |
+          size_check_args=()
+          if [[ "$ACCEPT_IMAGE_GROWTH" == "true" ]]; then
+            size_check_args+=(--accept-image-growth)
+          fi
+          python3 .github/scripts/image_sizes.py check --repo "$APP_REPO" --version "$RELEASE_LINE" --arch "$IMAGE_ARCH" "${size_check_args[@]}"
         env:
           APP_REPO: ${{ inputs.repo }}
           RELEASE_LINE: ${{ inputs.version }}
           IMAGE_ARCH: ${{ matrix.arch }}
+          ACCEPT_IMAGE_GROWTH: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.accept_image_growth }}
 
       - name: Create Trivy report directory
         run: mkdir -p trivy-results
@@ -263,8 +281,8 @@ jobs:
         if: ${{ always() && hashFiles('report.json') != '' }}
         uses: actions/upload-artifact@v7
         with:
-          name: image-sizes-${{ github.event_name == 'pull_request' && 'pr-' || '' }}${{ inputs.repo }}-${{ inputs.version }}-${{ matrix.arch }}
+          name: image-sizes-${{ github.event_name == 'pull_request' && 'pr-' || '' }}${{ inputs.repo }}-${{ inputs.version }}-${{ matrix.arch }}${{ github.event_name == 'pull_request' && format('-attempt-{0}', github.run_attempt) || '' }}
           path: report.json
           if-no-files-found: error
-          overwrite: true
+          overwrite: ${{ github.event_name != 'pull_request' }}
           retention-days: 90

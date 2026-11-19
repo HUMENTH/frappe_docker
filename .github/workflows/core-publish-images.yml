@@ -28,6 +28,11 @@ on:
         type: string
         default: trixie
         description: Debian Base Distribution
+      install_wkhtmltopdf:
+        required: false
+        type: boolean
+        default: true
+        description: Include wkhtmltopdf for legacy PDF formats
     secrets:
       DOCKERHUB_USERNAME:
         required: true
@@ -65,12 +70,15 @@ jobs:
 
       - name: Set build args
         run: |
-          echo "PYTHON_VERSION=${{ inputs.python_version }}" >> "$GITHUB_ENV"
-          echo "NODE_VERSION=${{ inputs.node_version }}" >> "$GITHUB_ENV"
-          echo "DEBIAN_BASE=${{ inputs.debian_base }}" >> "$GITHUB_ENV"
+          {
+            echo "PYTHON_VERSION=${{ inputs.python_version }}"
+            echo "NODE_VERSION=${{ inputs.node_version }}"
+            echo "DEBIAN_BASE=${{ inputs.debian_base }}"
+            echo "INSTALL_WKHTMLTOPDF=${{ inputs.install_wkhtmltopdf }}"
+          } >> "$GITHUB_ENV"
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v4.7.0
+        uses: docker/login-action@v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -85,7 +93,7 @@ jobs:
             *.attest=type=provenance,mode=max
 
       - name: Login to GHCR
-        uses: docker/login-action@v4.7.0
+        uses: docker/login-action@v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
